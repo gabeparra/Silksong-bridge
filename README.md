@@ -1,4 +1,3 @@
-```markdown
 # Silksong-bridge
 
 A minimal BepInEx plugin that opens a local WebSocket server to accept JSON commands (single object or an array/batch) and executes them on the Unity main thread. Designed as a bridge for Streamer.bot or any external client to control Silksong/Hollow Knight via a mod.
@@ -17,8 +16,8 @@ Usage
 4. Test:
    - Connect with a WebSocket client (e.g., websocat, Python websockets, Streamer.bot).
    - Send:
-     - Single command: `{"cmd":"log","msg":"hello from Streamer.bot"}`
-     - Batch: `[{"cmd":"log","msg":"one"},{"cmd":"log","msg":"two"}]`
+     - Single command: `{\"cmd\":\"log\",\"msg\":\"hello from Streamer.bot\"}`
+     - Batch: `[{\"cmd\":\"log\",\"msg\":\"one\"},{\"cmd\":\"log\",\"msg\":\"two\"}]`
 
 5. Extend:
    - Replace the `spawn_enemy` pseudo-code with the correct Silksong API calls (use dnSpy to find correct prefab paths/methods in Assembly-CSharp).

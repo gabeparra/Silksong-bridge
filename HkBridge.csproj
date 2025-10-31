@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>HkBridge</AssemblyName>
+    <RootNamespace>HkBridge</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference game/BepInEx assemblies. Update HintPath to point to your local files or copy DLLs into a lib/ folder. -->
+    <Reference Include="BepInEx">
+      <!-- <HintPath>lib\\BepInEx.dll</HintPath> -->
+    </Reference>
+    <Reference Include="UnityEngine">
+      <!-- <HintPath>lib\\UnityEngine.CoreModule.dll</HintPath> -->
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <!-- <HintPath>lib\\UnityEngine.CoreModule.dll</HintPath> -->
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>
