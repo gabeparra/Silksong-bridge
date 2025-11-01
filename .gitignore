@@ -1,0 +1,49 @@
+
+# Ignore build output folders
+bin/
+obj/
+
+# User/IDE files
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# MonoDevelop
+*.pidb
+
+# Rider
+.idea/
+*.sln.iml
+
+# VSCode settings
+.vscode/
+
+# Ignore Silksong local settings
+SilksongPath.props
+
+# Ignore unnecessary files (e.g., tests, temporary, logs)
+*.log
+
+# Ignore sourcelink output
+*.sourcelink.json
+
+# Ignore build artifacts
+*.dll
+*.pdb
+*.xml
+*.json
+*.dll.config
+*.dll.pdb
+*.dll.xml
+*.dll.config
+*.dll.pdb
+*.dll.xml

@@ -1,26 +1,43 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
-    <OutputType>Library</OutputType>
-    <AssemblyName>HkBridge</AssemblyName>
-    <RootNamespace>HkBridge</RootNamespace>
-    <LangVersion>latest</LangVersion>
-  </PropertyGroup>
 
-  <ItemGroup>
-    <!-- Reference game/BepInEx assemblies. Update HintPath to point to your local files or copy DLLs into a lib/ folder. -->
-    <Reference Include="BepInEx">
-      <!-- <HintPath>lib\\BepInEx.dll</HintPath> -->
-    </Reference>
-    <Reference Include="UnityEngine">
-      <!-- <HintPath>lib\\UnityEngine.CoreModule.dll</HintPath> -->
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <!-- <HintPath>lib\\UnityEngine.CoreModule.dll</HintPath> -->
-    </Reference>
-  </ItemGroup>
+    <!-- Imports silksong path properties only if present in order to allow CI builds. The file should be gitignored.-->
+    <Import Condition="Exists('SilksongPath.props')" Project="SilksongPath.props" />
 
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <!-- Disable nullable warnings for now -->
+        <Nullable>disable</Nullable>
+        <RestoreAdditionalProjectSources>
+            https://nuget.bepinex.dev/v3/index.json
+        </RestoreAdditionalProjectSources>
+        <!--Allow access of private members at runtime.-->
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyTitle>Silksong Bridge</AssemblyTitle>
+        <Version>0.1.0</Version>
+        <AssemblyName>HkBridge</AssemblyName>
+        <RootNamespace>Silksong.Bridge</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BepInEx.Analyzers" Version="1.0.8" PrivateAssets="all" />
+        <PackageReference Include="BepInEx.Core" Version="5.4.21" />
+        <PackageReference Include="UnityEngine.Modules" Version="6000.0.50" IncludeAssets="compile" />
+        <PackageReference Include="Silksong.GameLibs" Version="1.1.0-silksong1.0.28714"/>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    </ItemGroup>
+
+    <Target Name="CopyMod" AfterTargets="PostBuildEvent" Condition="'$(SilksongFolder)' != ''">
+        <ItemGroup>
+            <Binaries Include="$(TargetPath)"/>
+            <Binaries Include="$(TargetDir)/$(TargetName).pdb"/>
+            <!-- Only include XML if it exists -->
+            <Binaries Condition="Exists('$(TargetDir)/$(TargetName).xml')" Include="$(TargetDir)/$(TargetName).xml"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(Binaries)" DestinationFolder="$(SilksongFolder)/BepInEx/plugins/$(TargetName)" />
+    </Target>
+
 </Project>

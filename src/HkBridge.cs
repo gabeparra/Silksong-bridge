@@ -10,21 +10,21 @@ using System.Net.Sockets;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.WebSockets;
 using Newtonsoft.Json.Linq;
+
+namespace Silksong.Bridge;
 
 [BepInPlugin("com.gabeparra.silksong.bridge","Silksong Bridge","0.1.0")]
 public class HkBridge : BaseUnityPlugin
 {
     private readonly ConcurrentQueue<Action> mainThreadQueue = new ConcurrentQueue<Action>();
-    private readonly List<WebSocket> clients = new List<WebSocket>();
     private readonly object clientsLock = new object();
     private CancellationTokenSource cts;
     private readonly int port = 9000;
 
     void Awake()
     {
-        Logger.LogInfo($"Silksong Bridge starting on ws://127.0.0.1:{port}");
+        Logger.LogInfo($"Silksong Bridge starting on TCP port {port}");
         cts = new CancellationTokenSource();
         Task.Run(() => StartListener(port, cts.Token));
     }
@@ -40,11 +40,6 @@ public class HkBridge : BaseUnityPlugin
     void OnDestroy()
     {
         cts?.Cancel();
-        lock (clientsLock)
-        {
-            foreach (var ws in clients.ToArray()) { try { ws.Abort(); ws.Dispose(); } catch {} }
-            clients.Clear();
-        }
     }
 
     private void EnqueueMain(Action action) => mainThreadQueue.Enqueue(action);
@@ -101,9 +96,10 @@ public class HkBridge : BaseUnityPlugin
 
     private async Task StartListener(int port, CancellationToken token)
     {
-        var listener = new TcpListener(IPAddress.Loopback, port);
+        // NOTE: Using TCP-based JSON command interface for .NET Framework 4.7.2 compatibility
+        var listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
-        Logger.LogInfo($"Listener started on ws://127.0.0.1:{port}");
+        Logger.LogInfo($"Listener started on TCP port {port} (listening on all interfaces)");
         try
         {
             while (!token.IsCancellationRequested)
@@ -123,44 +119,21 @@ public class HkBridge : BaseUnityPlugin
     {
         using (tcpClient)
         using (var stream = tcpClient.GetStream())
-        using (var reader = new StreamReader(stream, Encoding.ASCII, false, 4096, true))
+        using (var reader = new StreamReader(stream, Encoding.UTF8))
+        using (var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true })
         {
-            // Read request start line
-            var start = await reader.ReadLineAsync().ConfigureAwait(false);
-            if (start == null) return;
-
-            // Read headers
-            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            string line;
-            while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync().ConfigureAwait(false)))
-            {
-                var parts = line.Split(new[] { ':', 2 });
-                if (parts.Length == 2) headers[parts[0].Trim()] = parts[1].Trim();
-            }
-
-            if (!headers.TryGetValue("Sec-WebSocket-Key", out var key)) return;
-            var accept = ComputeWebSocketAcceptKey(key);
-            var response = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n";
-            var respBytes = Encoding.ASCII.GetBytes(response);
-            await stream.WriteAsync(respBytes, 0, respBytes.Length, token).ConfigureAwait(false);
-
-            var ws = WebSocket.CreateFromStream(stream, true, null, TimeSpan.FromSeconds(30));
-            lock (clientsLock) { clients.Add(ws); }
             try
             {
-                var buffer = new byte[8192];
-                while (!token.IsCancellationRequested && ws.State == WebSocketState.Open)
+                while (!token.IsCancellationRequested && tcpClient.Connected)
                 {
-                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token).ConfigureAwait(false);
-                    if (result.MessageType == WebSocketMessageType.Close) break;
-                    var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    var line = await reader.ReadLineAsync().ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(line)) break;
 
                     try
                     {
-                        var tokenJson = JToken.Parse(msg);
+                        var tokenJson = JToken.Parse(line);
                         if (tokenJson.Type == JTokenType.Array)
                         {
-                            // Process batch atomically on main thread
                             var batch = tokenJson as JArray;
                             EnqueueMain(() =>
                             {
@@ -174,34 +147,20 @@ public class HkBridge : BaseUnityPlugin
                         {
                             EnqueueMain(() => ExecuteCommand(jobj));
                         }
+                        
                         var ack = new JObject { ["status"] = "queued" };
-                        var outBytes = Encoding.UTF8.GetBytes(ack.ToString());
-                        await ws.SendAsync(new ArraySegment<byte>(outBytes), WebSocketMessageType.Text, true, token).ConfigureAwait(false);
+                        await writer.WriteLineAsync(ack.ToString()).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
                         Logger.LogError($"Parse/queue error: {ex}");
                         var err = new JObject { ["status"] = "error", ["message"] = ex.Message };
-                        var outBytes = Encoding.UTF8.GetBytes(err.ToString());
-                        await ws.SendAsync(new ArraySegment<byte>(outBytes), WebSocketMessageType.Text, true, token).ConfigureAwait(false);
+                        await writer.WriteLineAsync(err.ToString()).ConfigureAwait(false);
                     }
                 }
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { Logger.LogError($"Client error: {ex}"); }
-            finally
-            {
-                lock (clientsLock) { clients.Remove(ws); }
-                try { ws.Abort(); ws.Dispose(); } catch { }
-            }
         }
-    }
-
-    private static string ComputeWebSocketAcceptKey(string secWebSocketKey)
-    {
-        var concat = secWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-        var sha1 = System.Security.Cryptography.SHA1.Create();
-        var hash = sha1.ComputeHash(Encoding.ASCII.GetBytes(concat));
-        return Convert.ToBase64String(hash);
     }
 }
