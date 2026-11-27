@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate project file XML and C# source
+        run: |
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('HkBridge.csproj')"
+          test -s src/HkBridge.cs
